@@ -1,7 +1,8 @@
-from math import cos,sin
+# Initial configuration
 import numpy as np
-import sys
+from math import cos,sin
 import pdb
+
 
 #######################################
 ## PREDIFINE CONSTATNS OF THE EXERCISE
@@ -11,37 +12,38 @@ TRANSLATION = np.array([0, 0, 0.25])
 ######################################
 
 
-def ENU_to_NED(X):
-	# Perform the rotation from Global World Coordinates system to INS
-	rotation_matrix = _3D_rotation_matrix(ROLL, PITCH, YAW)
-	return rotation_matrix @ X
+def enu_to_ned_ned_to_enu():
+    transformation_matrix = np.array([
+        [0., 1., 0., 0.],
+        [1., 0., 0., 0.],
+        [0., 0., -1., 0.],
+		[0., 0., 0., 1.]
+    ])
+    return transformation_matrix
 
-def NED_to_ENU(X):
-	# Perform the rotation from INS to Global World Coordinates system.
-	# Inverse of the previous one
-	rotation_matrix = _3D_rotation_matrix(ROLL, PITCH, YAW, inverso=True)
-	return rotation_matrix @ X
-	
-	
+
 def _3D_rotation_matrix(roll, pitch, yaw, order='ypr', inverso=False):
 	# Return the rotation matrix in 3D coordinate systems
 	yaw = np.array([
-		[cos(yaw), -sin(yaw), 0],
-		[sin(yaw), cos(yaw), 0],
-		[0, 0, 1]
+		[cos(yaw), -sin(yaw), 0, 0],
+		[sin(yaw), cos(yaw), 0, 0],
+		[0, 0, 1, 0],
+		[0, 0, 0, 1]
 	])
 	pitch = np.array([
-		[cos(pitch), 0, sin(pitch)],
-		[0, 1, 0],
-		[-sin(pitch), 0, cos(pitch)]
+		[cos(pitch), 0, sin(pitch), 0.],
+		[0, 1, 0, 0],
+		[-sin(pitch), 0, cos(pitch), 0],
+		[0, 0, 0, 1]
 	])
 	roll = np.array([
-		[1, 0, 0],
-		[0, cos(roll), -sin(roll)],
-		[0, sin(roll), cos(roll)]
+		[1, 0, 0, 0],
+		[0, cos(roll), -sin(roll), 0],
+		[0, sin(roll), cos(roll), 0],
+		[0, 0, 0, 1]
 	]) 
-
 	rotation_matrix = None
+	
 	if order=='ypr':
 		if inverso:
 			rotation_matrix = yaw.T @ pitch.T @ roll.T
@@ -54,52 +56,62 @@ def _3D_rotation_matrix(roll, pitch, yaw, order='ypr', inverso=False):
 			rotation_matrix = yaw @ pitch @ roll
 	else:
 		print("Order not supported")
-		sys.exit(-1)
 
 	return rotation_matrix
-		
 
-def _3D_Transform(rotation, T):
-	# Perform the translation in 3D coordinate systems 
-	transformation_matrix = np.zeros((4,4))
-	transformation_matrix[0:3,0:3] = rotation*1
-	transformation_matrix[:-1,-1] = T
-	transformation_matrix[-1,-1] = 1
-	return transformation_matrix
-	
-	
-def camera3D_to_gimbal3D(X, transformation_Matrix):
-	# Perform the transformation from camera (nadiral orientation) 
-	# to gimbal (forward orientation) 
-	return 
 
-def gimbal3D_to_INS3D(X, transformation_Matrix):
-	# Perform the transformation from camera (nadiral orientation) 
-	# to gimbal (forward orientation) 
-	return 
-	
-def compose_camera3D_to_World3D(transformation_Matrices):
-	# Perform the transformation from camera (nadiral orientation) 
-	# to gimbal (forward orientation) 
-	return 	
-def compose_World3D_to_camera3D(X, transformation_Matrix):
-	# Perform the transformation from camera (nadiral orientation) 
-	# to gimbal (forward orientation) 
-	return 	
-	
 
-def main(args):
-    return 0
+def wcs_to_ins():
+    # 1) ENU to NED
+    t1 = enu_to_ned_ned_to_enu()
 
-if __name__ == '__main__':
+    # 2) yaw, pitch, roll
+    t2 = _3D_rotation_matrix(ROLL, PITCH, YAW)
+    return t2 @ t1
+
+
+
+def ins_to_gimbal(traslation_vector):
+    # 1) NED to ENU
+    transformation_matrix = enu_to_ned_ned_to_enu()
     
-	# Pruebas
-	global_ = np.array([1,2,3])
-	print("Global:", global_)
-	
-	local_ = ENU_to_NED(global_)
-	print("Local:", local_)
-	
-	global_2 = NED_to_ENU(local_)
-	print("Global2:", global_2)
-	sys.exit(main(sys.argv))
+    # 2) Traslacion
+    transformation_matrix[:-1,-1] = traslation_vector*1
+    pdb.set_trace()
+    return transformation_matrix
+
+
+
+# Si camara Nadiral orientation -> rotacion 180 en eje e
+def gimbal_to_camera(omega=180):
+    rotation_mat = np.array([
+		[1, 0, 0, 0],
+		[0, cos(omega), -sin(omega), 0],
+		[0, sin(omega), cos(omega), 0],
+		[0, 0, 0, 1]
+	]) 
+
+    return rotation_mat
+
+
+
+t1 = wcs_to_ins()
+print("wcs to ins:", t1)
+
+
+t2 = ins_to_gimbal(TRANSLATION)
+print("ins to gimbal", t2)
+
+exit()
+
+t3 = gimbal_to_camera()
+print("gimbal to camera",t3)
+
+# TOTAL
+t = t3 @ t2 @ t1
+print("full matrix:", t)
+
+### Ejemplo de proyeccion
+punto = np.array([3, 4, 0, 1])
+proyeccion = t @ punto
+print("Proyeccion del punto", punto, "a ", proyeccion)
